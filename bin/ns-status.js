@@ -1,6 +1,11 @@
 #!/usr/bin/env node
+'use strict';
 
-var fs = require('fs');
+var os = require("os");
+
+var requireUtils = require('../lib/require-utils');
+var safeRequire = requireUtils.safeRequire;
+var requireWithTimestamp = requireUtils.requireWithTimestamp;
 
 /*
   Prepare Status info to for upload to Nightscout
@@ -18,46 +23,120 @@ var fs = require('fs');
 
 */
 
-function requireWithTimestamp (path) {
-  var resolved = require(path);
+function mmtuneStatus (status) {
+    var mmtune = requireWithTimestamp(cwd + mmtune_input);
+    if (mmtune) {
+        if (mmtune.scanDetails && mmtune.scanDetails.length) {
+            mmtune.scanDetails = mmtune.scanDetails.filter(function (d) {
+                return d[2] > -99;
+            });
+        }
+      status.mmtune = mmtune;
+    }
+}
 
-  if (resolved) {
-    resolved.timestamp = fs.statSync(path).mtime;
-  }
-
-  return resolved;
+function uploaderStatus (status) {
+    var uploader = require(cwd + uploader_input);
+    if (uploader) {
+        if (typeof uploader === 'number') {
+            status.uploader = {
+                battery: uploader
+            };
+        } else {
+            status.uploader = uploader;
+        }
+    }
 }
 
 if (!module.parent) {
-    
-    var clock_input = process.argv.slice(2, 3).pop();
-    var iob_input = process.argv.slice(3, 4).pop();
-    var suggested_input = process.argv.slice(4, 5).pop();
-    var enacted_input = process.argv.slice(5, 6).pop();
-    var battery_input = process.argv.slice(6, 7).pop();
-    var reservoir_input = process.argv.slice(7, 8).pop();
-    var status_input = process.argv.slice(8, 9).pop();
+
+    var argv = require('yargs')
+        .usage("$0 <clock.json> <iob.json> <suggested.json> <enacted.json> <battery.json> <reservoir.json> <status.json> [--uploader uploader.json] [mmtune.json]")
+        .option('uploader', {
+            alias: 'u',
+            describe: "Uploader battery status",
+            default: false
+        })
+        .strict(true)
+        .help('help');
+
+    var params = argv.argv;
+    var inputs = params._;
+    var clock_input = inputs[0];
+    var iob_input = inputs[1];
+    var suggested_input = inputs[2];
+    var enacted_input = inputs[3];
+    var battery_input = inputs[4];
+    var reservoir_input = inputs[5];
+    var status_input = inputs[6];
+    var mmtune_input = inputs[7];
+    var uploader_input = params.uploader;
+
+    if (inputs.length > 8) {
+        uploader_input = params.uploader ? inputs[7] : false;
+        mmtune_input = inputs[8];
+    }
 
     if (!clock_input || !iob_input || !suggested_input || !enacted_input || !battery_input || !reservoir_input || !status_input) {
-        console.log('usage: ', process.argv.slice(0, 2), '<clock.json> <iob.json> <suggested.json> <enacted.json> <battery.json> <reservoir.json> <status.json>');
+        console.log('usage: ', process.argv.slice(0, 2), '<clock.json> <iob.json> <suggested.json> <enacted.json> <battery.json> <reservoir.json> <status.json> [--uploader uploader.json] [mmtune.json]');
         process.exit(1);
     }
-    
-    var cwd = process.cwd();
 
-    var status = {
-      openaps: {
-        iob: requireWithTimestamp(cwd + '/' + iob_input)
-        , suggested: requireWithTimestamp(cwd + '/' + suggested_input)
-        , enacted: requireWithTimestamp(cwd + '/' + enacted_input)
-      }
-      , pump: {
-        clock: require(cwd + '/' + clock_input)
-        , battery: require(cwd + '/' + battery_input)
-        , reservoir: require(cwd + '/' + reservoir_input)
-        , status: requireWithTimestamp(cwd + '/' + status_input)
-      }
-    };
+    var cwd = process.cwd() + '/';
 
-    console.log(JSON.stringify(status));
+    var hostname = 'unknown';
+    try {
+        hostname = os.hostname();
+    } catch (e) {
+      return console.error('Unable to get hostname to send with status', e);
+    }
+
+    try {
+        var iob = null;
+        var iobArray = requireWithTimestamp(cwd + iob_input);
+        var suggested = requireWithTimestamp(cwd + suggested_input);
+        var enacted = requireWithTimestamp(cwd + enacted_input);
+
+        if (iobArray && iobArray.length) {
+            iob = iobArray[0];
+            iob.timestamp = iob.time;
+            delete iob.time;
+        }
+
+        // we only need the most current predBGs
+        if (enacted && suggested) {
+          if (enacted.timestamp > suggested.timestamp) {
+            delete suggested.predBGs;
+          } else {
+            delete enacted.predBGs;
+          }
+        }
+
+        var status = {
+            device: 'openaps://' + os.hostname(),
+            openaps: {
+                iob: iob,
+                suggested: suggested,
+                enacted: enacted
+            },
+            pump: {
+                clock: safeRequire(cwd + clock_input),
+                battery: safeRequire(cwd + battery_input),
+                reservoir: safeRequire(cwd + reservoir_input),
+                status: requireWithTimestamp(cwd + status_input)
+            }
+        };
+
+        if (mmtune_input) {
+            mmtuneStatus(status);
+        }
+
+        if (uploader_input) {
+            uploaderStatus(status);
+        }
+
+        console.log(JSON.stringify(status));
+    } catch (e) {
+        return console.error("Could not parse input data: ", e);
+    }
 }

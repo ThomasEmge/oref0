@@ -1,18 +1,21 @@
 # oref0
 
+Algorithm for OpenAPS implementations. To get started with OpenAPS, see the [OpenAPS documentation](http://openaps.readthedocs.org/en/latest/)
 
-Javascript plugins for openaps
-
-## Installing
+## Installing oref0
 
 Install tools globally:
 
-`sudo npm install -g oref0`
+`npm run global-install`
 
-## Usage
+## Usage of oref0
 
 ### `oref0`
-The open reference implementation of the reference design.
+
+<details>
+    <summary>The open reference implementation of the reference design. (click to expand for more usage details)</summary>
+<br>
+  
 ```
   Usage:
 oref0 <cmd>
@@ -57,8 +60,6 @@ The result is suitable for sending to Nightscout's entries api, eg, using
 `ns-upload-entries`.
 ```
 mm-format-ns-glucose <input> <output>
-
-
 ```
 
 ### `mm-format-ns-pump-history`
@@ -82,16 +83,13 @@ These can be defined in crontab, or in a simple file, eg
 
 ```
 API_SECRET="..." NIGHTSCOUT_HOST=localhost:1337 ns-upload-entries <input> <output>
-
 ```
 
-## Contributing
-
-See the [CONTRIBUTING document](CONTRIBUTING.md)
 ### Get the source
 
 ```
 git clone git://github.com/openaps/oref0.git
+cd oref0
 git checkout dev
 git checkout -b wip/my-enhancement-fix-or-proposal
 ```
@@ -114,6 +112,11 @@ git push origin -u wip/my-enhancement-fix-or-proposal
 ```
 Then target our `dev` branch for a pull request/peer review.
 
+</details>
+
+## Contributing
+
+See the [CONTRIBUTING document](CONTRIBUTING.md). PRs welcome!
 
 ## openaps
 
@@ -132,11 +135,13 @@ contributors from liability.
 *Note:* This is intended to be a set of tools to support a self-driven DIY
 implementation and any person choosing to use these tools is solely
 responsible for testing and implement these tools independently or
-together as a system.  The [DIY part of OpenAPS is important]
-(http://bit.ly/1NBbZtO). While formal training or experience as an
+together as a system.  The [DIY part of OpenAPS is important](http://bit.ly/1NBbZtO).
+While formal training or experience as an
 engineer or a developer is not required, what *is* required is a growth
 mindset to learn what are essentially "building blocks" to implement an
 OpenAPS instance. This is not a "set and forget" system; it requires
 diligent and consistent testing and monitoring to ensure each piece of
 the system is monitoring, predicting, and performing as desired.  The
-performance and quality of your system lies solely with you.
+performance and quality of your system lies solely with you. 
+
+Read the [OpenAPS documentation](http://openaps.readthedocs.io/en/latest/) for more details.

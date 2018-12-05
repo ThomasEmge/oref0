@@ -18,15 +18,38 @@
 
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+CLOCK=${1-monitor/clock-zoned.json}
+GLUCOSE=${2-monitor/glucose.json}
+PUMP=${3-pump}
+CGM=${4-cgm}
+
 die() { echo "$@" ; exit 1; }
+self=$(basename $0)
+function usage ( ) {
 
-ntp-wait -n 1 -v && die "NTP already synchronized." || ( sudo /etc/init.d/ntp restart && ntp-wait -n 1 -v && die "NTP re-synchronized." )
+cat <<EOF
+$self
+$self - Set pump and CGM clocks based on NTP time if avaialble.
+EOF
+}
 
-cd ~/openaps-dev
-( cat clock.json; echo ) | sed 's/"//g' | sed "s/$/`date +%z`/" | while read line; do date -u -d $line +"%F %R:%S"; done > fake-hwclock.data
-grep : fake-hwclock.data && sudo cp fake-hwclock.data /etc/fake-hwclock.data
-sudo fake-hwclock load
-grep -q display_time glucose.json && grep display_time glucose.json | head -1 | awk '{print $2}' | sed "s/,//" | sed 's/"//g' | sed "s/$/`date +%z`/" | while read line; do date -u -d $line +"%F %R:%S"; done > fake-hwclock.data
-grep -q dateString glucose.json && grep dateString glucose.json | head -1 | awk '{print $2}' | sed "s/,//" | sed 's/"//g' |while read line; do date -u -d $line +"%F %R:%S"; done > fake-hwclock.data
-grep : fake-hwclock.data && sudo cp fake-hwclock.data /etc/fake-hwclock.data
-sudo fake-hwclock load
+case "$1" in
+  --help|help|-h)
+    usage
+    exit 0
+    ;;
+esac
+
+
+checkNTP() { ntp-wait -n 1 -v || ( sudo /etc/init.d/ntp restart && ntp-wait -n 1 -v ) }
+
+if checkNTP; then
+    sudo ntpdate -s -b time.nist.gov
+    echo Setting pump time to $(date)
+    openaps use $PUMP set_clock --to now 2>&1 >/dev/null | tail -1
+    # xdripaps CGM does not have a clock to set, so don't try.
+    if [ ! -d xdrip ]; then
+      echo Setting CGM time to $(date)
+      openaps use $CGM UpdateTime --to now 2>&1 >/dev/null | tail -1
+    fi
+fi
